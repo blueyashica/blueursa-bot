@@ -4,6 +4,7 @@ import asyncio
 import os
 import json
 from google import genai
+from google.genai import types
 
 # --- Local Storage Setup for FAQs and Info ---
 FAQ_FILE = "faqs.json"
@@ -23,7 +24,7 @@ def save_data(filename, data):
         json.dump(data, f, indent=4)
 
 faqs = load_data(FAQ_FILE, {
-    "payment": "We accept Net Banking, PayPal, Wise, and Credit/Debit Cards! We operate on a strict 50% upfront structure before work begins. Open a ticket for specific details."
+    "payment": "We operate on a strict 50% upfront payment structure before work begins, with the remaining 50% released upon project sign-off. We accept Net Banking, PayPal, Wise, and Credit/Debit Cards."
 })
 
 info_data = load_data(INFO_FILE, {
@@ -36,7 +37,7 @@ info_data = load_data(INFO_FILE, {
     "cofounder_age": "20",
     "cofounder_email": "kabilan0728@gmail.com",
     "cofounder_location": "Chennai, Tamil Nadu",
-    "agency_about": "BlueUrsa helps creators and businesses grow their audience and retain it. Growth and retention bring people in and keep them there."
+    "agency_about": "BlueUrsa helps creators and businesses grow their audience and retain it through dedicated specialized teams."
 })
 
 # --- Gemini AI Client Initialization ---
@@ -166,7 +167,7 @@ class TicketPanelView(discord.ui.View):
     async def open_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(TicketModal())
 
-# --- Bot Events & AI Mentions ---
+# --- Bot Events & Natural AI Mentions ---
 @client.event
 async def on_ready():
     print(f"Logged in as {client.user} (ID: {client.user.id})")
@@ -179,58 +180,47 @@ async def on_message(message: discord.Message):
     # Check if bot is tagged
     if client.user in message.mentions:
         content = message.content.replace(f"<@{client.user.id}>", "").strip()
-        content_lower = content.lower()
 
-        # Direct Keyword Checks for Instant Accurate Responses
-        if "payment" in content_lower or "pay" in content_lower:
-            await message.channel.send(f"💳 **Payment Methods:** {faqs.get('payment', 'Net Banking, PayPal, Wise, and Credit/Debit Cards! Open a ticket for more info.')}")
+        if not content:
+            await message.channel.send("Hey there! How can I help you today?")
             return
 
-        if "founder" in content_lower or "yashica" in content_lower:
-            if "full" in content_lower or "detail" in content_lower or "email" in content_lower:
-                resp = (f"👤 **Founder Full Details:**\n"
-                        f"• **Name:** {info_data['founder_name']}\n"
-                        f"• **Role:** {info_data['founder_role']}\n"
-                        f"• **Age:** {info_data['founder_age']}\n"
-                        f"• **Work Email:** {info_data['founder_email']}")
-            else:
-                resp = f"👤 The Operating and Managing Head of BlueUrsa is **{info_data['founder_name']}**."
-            await message.channel.send(resp)
-            return
-
-        if "co-founder" in content_lower or "cofounder" in content_lower or "kabilan" in content_lower:
-            if "full" in content_lower or "detail" in content_lower:
-                resp = (f"🤝 **Co-Founder Full Details:**\n"
-                        f"• **Name:** {info_data['cofounder_name']}\n"
-                        f"• **Role:** {info_data['cofounder_role']}\n"
-                        f"• **Age:** {info_data['cofounder_age']}\n"
-                        f"• **Location:** {info_data['cofounder_location']}\n"
-                        f"• **Email:** {info_data['cofounder_email']}")
-            else:
-                resp = f"🤝 The Co-Founder of BlueUrsa is **{info_data['cofounder_name']}** ({info_data['cofounder_role']})."
-            await message.channel.send(resp)
-            return
-
-        # Fallback to AI Chat via Gemini
         if ai_client:
-            prompt = (
-                f"You are Ursa Minor, the official AI assistant for BlueUrsa agency. "
-                f"Agency Info: {info_data['agency_about']}. "
-                f"Founder: {info_data['founder_name']} ({info_data['founder_role']}). "
-                f"Co-Founder: {info_data['cofounder_name']} ({info_data['cofounder_role']}). "
-                f"Respond to this message concisely and professionally: {content}"
-            )
+            # Construct comprehensive system instruction so AI responds naturally like a real human rep
+            system_instruction = f"""
+            You are Ursa Minor, the official, intelligent AI representative for BlueUrsa agency.
+            You speak naturally, warmly, professionally, and humanly. NEVER sound like a robotic template, repeat static scripts, or dump raw bullet points unless specifically asked for a full breakdown.
+            
+            Key Grounding Knowledge:
+            - Agency Overview: BlueUrsa is a digital agency built around sustainable growth and retention for creators and businesses.
+            - Founder: Yashica. Role: Operating & Managing Head, Freelancer, Copywriter, Author. Age: 17 (Born Jan 26, 2009). Email: blueyashica@gmail.com.
+            - Co-Founder: Kabilan. Role: Co-Founder & Key Executive Assisting Lead. Age: 20. Location: Chennai, Tamil Nadu. Email: kabilan0728@gmail.com.
+            - Payments & Finances: 50% upfront before work starts, remaining 50% upon client sign-off. Methods: Net Banking, PayPal, Wise, Debit/Credit Card. Transparent net payouts for freelancers with no hidden cuts.
+            - Operations: Client work is delivered strictly under the BlueUrsa umbrella. Middleman policy prohibits direct client contact outside agency channels.
+            - Active FAQs: {json.dumps(faqs)}
+            
+            Guidelines:
+            - If someone asks a quick question (e.g., "who is the founder?", "what is your payment policy?"), give a concise, conversational answer.
+            - Only give full detailed breakdowns (emails, ages, roles) if the user asks for "full details" or "complete info".
+            - Keep responses concise, helpful, and natural for Discord.
+            """
+
             try:
                 async with message.channel.typing():
-                    response = ai_client.models.generate_content(
+                    response = await ai_client.aio.models.generate_content(
                         model="gemini-2.5-flash",
-                        contents=prompt,
+                        contents=content,
+                        config=types.GenerateContentConfig(
+                            system_instruction=system_instruction,
+                            temperature=0.7
+                        )
                     )
                     await message.channel.send(response.text)
             except Exception as e:
-                await message.channel.send("Hello! I am Ursa Minor, the BlueUrsa agency bot. How can I assist you today?")
+                print(f"Gemini API Error: {e}")
+                await message.channel.send("I'm here! Feel free to ask me anything about BlueUrsa, our team, or open a support ticket if you need assistance.")
         else:
-            await message.channel.send("Hello! I am Ursa Minor. How can I assist you today?")
+            await message.channel.send("Hey! I am Ursa Minor. How can I help you today?")
 
 # --- Slash Commands ---
 @client.tree.command(name="setticketpanel", description="Set up the ticket panel in a specific channel")
