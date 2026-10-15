@@ -55,7 +55,7 @@ class ClaimTicketView(discord.ui.View):
         button.label = f"Claimed by {interaction.user.display_name}"
         await interaction.message.edit(view=self)
 
-        # Welcome message inside the thread with the Close button
+        # Welcome message inside the thread with the Close button attached
         welcome_embed = discord.Embed(
             title="Ticket Claimed",
             description=f"Hello {self.ticket_user.mention}, your ticket has been claimed by {interaction.user.mention}. You can both chat here privately.",
@@ -89,7 +89,7 @@ class TicketModal(discord.ui.Modal, title="Create a Support Ticket"):
             ephemeral=True
         )
         
-        # Post the ticket panel message with the Claim button
+        # Post the ticket notification with the Claim button
         await interaction.channel.send(
             content=f"New ticket opened by {interaction.user.mention}",
             embed=embed,
@@ -126,6 +126,19 @@ async def set_ticket_panel(interaction: discord.Interaction, channel: discord.Te
         f"✅ Ticket panel sent to {target_channel.mention}!", 
         ephemeral=True
     )
+
+@client.tree.command(name="endticket", description="Close and delete the current ticket thread")
+async def end_ticket(interaction: discord.Interaction):
+    # Check if the command is being used inside a thread
+    if isinstance(interaction.channel, discord.Thread):
+        await interaction.response.send_message("Closing and deleting this ticket thread in 5 seconds...")
+        await asyncio.sleep(5)
+        try:
+            await interaction.channel.delete()
+        except Exception:
+            pass
+    else:
+        await interaction.response.send_message("⚠️ This command can only be used inside a ticket thread!", ephemeral=True)
 
 # Run the bot
 TOKEN = os.getenv("DISCORD_TOKEN")
