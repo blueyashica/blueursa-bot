@@ -40,13 +40,18 @@ class ClaimTicketView(discord.ui.View):
 
     @discord.ui.button(label="🔐 Claim Ticket", style=discord.ButtonStyle.success, custom_id="claim_ticket_btn")
     async def claim_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Restrict claiming to staff members only (checking Manage Messages permission)
+        if not interaction.user.guild_permissions.manage_messages:
+            await interaction.response.send_message("❌ Only staff members can claim tickets!", ephemeral=True)
+            return
+
         # Create private thread from the message
         thread = await interaction.message.create_thread(
             name=f"ticket-{self.ticket_user.name}", 
             auto_archive_duration=1440
         )
         
-        # Add the ticket creator and the staff member to the private thread so they can type
+        # Add the ticket creator and the staff member to the private thread
         await thread.add_user(self.ticket_user)
         await thread.add_user(interaction.user)
 
@@ -66,20 +71,27 @@ class ClaimTicketView(discord.ui.View):
         await thread.send(embed=welcome_embed, view=CloseTicketView())
         await interaction.response.send_message(f"Ticket claimed! Private thread created: {thread.mention}", ephemeral=True)
 
-# --- Ticket Modal ---
+# --- Ticket Modal (With Subject & Reason) ---
 class TicketModal(discord.ui.Modal, title="Create a Support Ticket"):
+    subject = discord.ui.TextInput(
+        label="Subject",
+        placeholder="Brief summary of your issue...",
+        required=True,
+        max_length=100
+    )
+    
     reason = discord.ui.TextInput(
-        label="Reason for ticket",
+        label="Reason / Description",
         style=discord.TextStyle.paragraph,
-        placeholder="Please describe your issue or question here...",
+        placeholder="Please describe your issue or question in detail...",
         required=True,
         max_length=1000,
     )
 
     async def on_submit(self, interaction: discord.Interaction):
         embed = discord.Embed(
-            title=f"New Ticket from {interaction.user.name}",
-            description=self.reason.value,
+            title=f"Ticket: {self.subject.value}",
+            description=f"**Submitted by:** {interaction.user.mention}\n\n**Reason:**\n{self.reason.value}",
             color=discord.Color.blue()
         )
         embed.set_footer(text=f"User ID: {interaction.user.id}")
@@ -129,7 +141,6 @@ async def set_ticket_panel(interaction: discord.Interaction, channel: discord.Te
 
 @client.tree.command(name="endticket", description="Close and delete the current ticket thread")
 async def end_ticket(interaction: discord.Interaction):
-    # Check if the command is being used inside a thread
     if isinstance(interaction.channel, discord.Thread):
         await interaction.response.send_message("Closing and deleting this ticket thread in 5 seconds...")
         await asyncio.sleep(5)
