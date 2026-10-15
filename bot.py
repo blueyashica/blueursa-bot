@@ -12,10 +12,9 @@ FAQ_FILE = "faqs.json"
 def load_faqs():
     if not os.path.exists(FAQ_FILE):
         default_faqs = {
-            "payment": "We currently accept PayPal, Credit/Debit cards, and Crypto. For custom invoicing, please open a ticket!",
+            "payment": "We currently accept PayPal/wise, Credit/Debit cards, and Net Banking. For custom invoicing, please open a ticket!",
             "rules": "Please review our server rules in the #rules channel. Respect all members and avoid spamming.",
             "support": "You can open a support ticket by clicking the button in the #tickets channel or asking a staff member.",
-            "pricing": "Check our #pricing channel for detailed service rates and custom packages."
         }
         save_faqs(default_faqs)
         return default_faqs
